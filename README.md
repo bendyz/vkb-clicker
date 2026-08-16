@@ -1,72 +1,87 @@
 # vkb-clicker
 
-Autoclicker dla Linux/Wayland. Wysyla klikniecia myszy przez wirtualne
-urzadzenie `/dev/uinput`, dzieki czemu dziala niezaleznie od kompozytora
-(Wayland celowo blokuje aplikacjom nasluchiwanie globalnych skrotow
-klawiszowych, ale nie blokuje wstrzykiwania zdarzen wejscia przez uinput).
+A minimal autoclicker for Linux/Wayland. It sends mouse clicks through a
+virtual `/dev/uinput` device, so it works regardless of your compositor
+(Wayland deliberately blocks apps from listening for global hotkeys, but it
+does not block input injection via uinput).
 
-Klikniecia trafiaja w biezaca pozycje kursora — appka nie rusza myszka,
-tylko generuje wcisniecie/puszczenie przycisku.
+Clicks land at the current cursor position — the app never moves the mouse,
+it only generates button press/release events.
 
-## Budowanie
+## Building
 
 ```sh
 cargo build --release
 ```
 
-Plik wynikowy: `target/release/vkb-clicker`. Mozna go skopiowac np. do
-`~/.local/bin/vkb-clicker` (upewnij sie, ze ten katalog jest w `$PATH`).
-
-## Uzycie
+The binary ends up at `target/release/vkb-clicker`. Copy it somewhere on
+your `$PATH`, e.g.:
 
 ```sh
-# start klikania: 20ms trzymania, 10ms przerwy (wartosci domyslne)
+cp target/release/vkb-clicker ~/.local/bin/
+```
+
+## Usage
+
+```sh
+# start clicking: 20ms hold, 10ms pause (defaults)
 vkb-clicker --click-ms 20 --pause-ms 10
 
-# lewy/prawy/srodkowy przycisk
+# left/right/middle button
 vkb-clicker --click-ms 20 --pause-ms 10 --button left
 
-# zatrzymanie dzialajacej instancji
+# stop the running instance
 vkb-clicker --kill
 ```
 
-Program pilnuje jednej instancji na uzytkownika (plik PID w
-`$XDG_RUNTIME_DIR/vkb-clicker.pid`) — ponowne uruchomienie bez `--kill`,
-gdy klikanie juz trwa, zakonczy sie odmowa.
+The program enforces a single instance per user (PID file at
+`$XDG_RUNTIME_DIR/vkb-clicker.pid`) — starting it again without `--kill`
+while it's already clicking will refuse to run.
 
-## Uprawnienia do /dev/uinput
+## Permissions for /dev/uinput
 
-Na tym systemie `/dev/uinput` nalezy do grupy `users` z prawem zapisu, wiec
-zwykly uzytkownik moze z niego korzystac bez roota. Jesli na innej maszynie
-dostaniesz `Permission denied`, dodaj regule udev, np.
+On some systems `/dev/uinput` is writable only by root. If you get
+`Permission denied`, add a udev rule, e.g.
 `/etc/udev/rules.d/60-uinput.rules`:
 
 ```
 KERNEL=="uinput", MODE="0660", GROUP="input", TAG+="uaccess"
 ```
 
-i dodaj siebie do grupy `input` (`sudo usermod -aG input $USER`, potem
-relogin).
+then add yourself to the `input` group (`sudo usermod -aG input $USER`) and
+log back in.
 
-## Podpiecie pod skroty klawiszowe (KDE Plasma)
+## Binding to keyboard shortcuts
 
-Wayland nie pozwala aplikacjom przechwytywac globalnych skrotow, wiec to
-kompozytor musi wywolac odpowiednia komende. W KDE Plasma:
+Wayland does not let applications capture global hotkeys, so the compositor
+has to invoke the command for you. Bind two shortcuts — one to start, one to
+stop:
 
-1. **Ustawienia systemowe -> Skroty -> Wlasne skroty** (System Settings ->
-   Shortcuts -> Custom Shortcuts).
-2. Kliknij prawym na "Wlasne" -> Nowy -> Polecenie/Adres URL (Global
-   Shortcut -> Command/URL).
-3. Nazwa: `Start klikania`. Polecenie:
-   `/home/bendyz/.local/bin/vkb-clicker --click-ms 20 --pause-ms 10`
-   (podaj pelna sciezke do binarki). Przypisz np. `Ctrl+Alt+F9`.
-4. Utworz drugi wpis: nazwa `Stop klikania`, polecenie
-   `/home/bendyz/.local/bin/vkb-clicker --kill`, skrot np. `Ctrl+Alt+F10`.
-5. Zastosuj. Od teraz pierwszy skrot startuje klikanie w miejscu kursora
-   (np. nad przyciskiem w grze przegladarkowej), a drugi je zatrzymuje —
-   dziala globalnie, niezaleznie od tego, ktore okno ma fokus.
+**KDE Plasma** — System Settings -> Shortcuts -> Custom Shortcuts -> right
+click "Custom" -> New -> Command/URL:
+- "Start clicking": command `vkb-clicker --click-ms 20 --pause-ms 10`, e.g.
+  bound to `Ctrl+Alt+F9`.
+- "Stop clicking": command `vkb-clicker --kill`, e.g. bound to
+  `Ctrl+Alt+F10`.
 
-## Uwaga
+**GNOME** — Settings -> Keyboard -> Keyboard Shortcuts -> Custom Shortcuts,
+same idea: one entry running `vkb-clicker --click-ms 20 --pause-ms 10`,
+another running `vkb-clicker --kill`.
 
-Automatyczne klikanie w grach przegladarkowych moze naruszac regulamin
-danej gry/serwisu — to Twoja odpowiedzialnosc jako uzytkownika.
+**Sway / Hyprland** — add to your config:
+
+```
+bindsym Ctrl+Alt+F9 exec vkb-clicker --click-ms 20 --pause-ms 10
+bindsym Ctrl+Alt+F10 exec vkb-clicker --kill
+```
+
+(Hyprland uses `bind = ` instead of `bindsym`.)
+
+Once bound, the first shortcut starts clicking wherever your cursor is
+(e.g. over a button in a browser game), and the second stops it — it works
+globally, regardless of which window has focus.
+
+## Note
+
+Automated clicking in browser games may violate that game's or service's
+terms of use — that's on you as the user.
