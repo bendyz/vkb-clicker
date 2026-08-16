@@ -12,9 +12,10 @@ use std::time::Duration;
 /// Autoclicker dla Waylanda - wirtualne urzadzenie myszy przez /dev/uinput.
 ///
 /// Uruchomienie bez --kill rozpoczyna klikanie w biezacej pozycji kursora.
-/// Podepnij te komende oraz `vkb-clicker --kill` pod dwie osobne kombinacje
-/// klawiszy w ustawieniach skrotow swojego srodowiska (np. KDE System Settings
-/// -> Shortcuts -> Custom Shortcuts).
+/// Jesli inna instancja juz dziala, kolejne uruchomienie (bez --kill) po
+/// prostu ja zatrzyma - dzieki temu jedna kombinacja klawiszy moze pelnic
+/// role przelacznika start/stop. Mozna tez uzyc dwoch osobnych skrotow:
+/// jeden uruchamiajacy program normalnie, drugi wywolujacy `--kill`.
 #[derive(Parser, Debug)]
 #[command(name = "vkb-clicker", version, about)]
 struct Args {
@@ -97,9 +98,11 @@ fn main() {
         return;
     }
 
-    if let Some(pid) = read_running_pid() {
-        eprintln!("vkb-clicker juz dziala (PID {pid}). Zatrzymaj go przez `vkb-clicker --kill`.");
-        std::process::exit(1);
+    if read_running_pid().is_some() {
+        // Toggle behaviour: a second launch (same shortcut) stops the running instance
+        // instead of erroring out, so one hotkey can drive both start and stop.
+        kill_running();
+        return;
     }
 
     let key = resolve_button(&args.button);
